@@ -39,7 +39,8 @@ logger.addHandler(handler)
 
 
 def send_message(bot, message):
-    '''Отправка сообщения.'''
+    """Отправка сообщения."""
+
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logger.info('Сообщение отправлено.')
@@ -48,7 +49,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    '''Запрос к ENDPOINT.'''
+    """Запрос к ENDPOINT."""
 
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
@@ -65,7 +66,7 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    '''Проверка ответа на корректность.'''
+    """Проверка ответа на корректность."""
 
     try:
         homeworks = response['homeworks']
@@ -91,7 +92,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    '''Извлечение статуса о домашней работе.'''
+    """Извлечение статуса о домашней работе."""
 
     try:
         homework_name = homework.get('homework_name')
@@ -115,7 +116,7 @@ def parse_status(homework):
 
 
 def check_tokens():
-    '''Проверка переменных окружения.'''
+    """Проверка переменных окружения."""
 
     return all([TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRACTICUM_TOKEN])
 
