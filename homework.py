@@ -125,7 +125,6 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         message = 'Переменная среды не найдена.'
         logger.critical(message)
