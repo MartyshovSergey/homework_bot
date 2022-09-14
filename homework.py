@@ -27,24 +27,19 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-    level=logging.INFO,
-)
-
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 def send_message(bot, message):
     """Отправка сообщения."""
     try:
+        logger.info('Отправка сообщения.')
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logger.info('Сообщение отправлено.')
     except exceptions.SendMessageFailureException:
-        logger.error('Сообщение не отправлено.')
+        message = 'Сообщение не отправлено.'
+        raise exceptions.SendMessageFailureException(message)
 
 
 def get_api_answer(current_timestamp):
@@ -55,34 +50,47 @@ def get_api_answer(current_timestamp):
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except exceptions.ResponseStatusException:
-        logger.error('Сбой запроса к ENDPOINT.')
-    if response.status_code != HTTPStatus.OK:
         message = 'Сбой запроса к ENDPOINT.'
-        logger.error(message)
         raise exceptions.ResponseStatusException(message)
+    if response.status_code != HTTPStatus.OK:
+        raise SystemError(f'Ошибка: {response.reason}; '
+                          f'Код: {response.status_code}')
     return response.json()
 
 
 def check_response(response):
     """Проверка ответа на корректность."""
+    keys = ['current_date', 'homeworks']
+
+    if not isinstance(response, dict):
+        message = (f'Ответ является {type(response)}, а не словарем')
+        raise TypeError(message)
+
     try:
-        homeworks = response['homeworks']
+        homeworks = response.get('homeworks')
     except KeyError as error:
         message = f'Ошибка доступа: {error}'
-        logger.error(message)
+        raise exceptions.CheckResponseException(message)
+
+    if keys[0] not in response.keys() and keys[1] not in response.keys():
+        empty_key_list = []
+        for key in keys:
+            if key not in response.keys():
+                empty_key_list.append(key)
+        message = (f'Отсутствует: {",".join(empty_key_list)}')
         raise exceptions.CheckResponseException(message)
 
     if homeworks is None:
         message = 'Ответ не содежит словаря с домашники работами.'
-        logger.error(message)
         raise exceptions.CheckResponseException(message)
-    if len(homeworks) == 0:
-        message = 'За последнее время нет домашних работ.'
-        logger.error(message)
-        raise exceptions.CheckResponseException(message)
+
     if not isinstance(homeworks, list):
         message = 'Ответ не представлен списком'
         logger.error(message)
+        raise exceptions.CheckResponseException(message)
+
+    if len(homeworks) == 0:
+        message = 'За последнее время нет домашних работ.'
         raise exceptions.CheckResponseException(message)
 
     return homeworks
@@ -90,22 +98,21 @@ def check_response(response):
 
 def parse_status(homework):
     """Извлечение статуса о домашней работе."""
-    try:
-        homework_name = homework.get('homework_name')
-    except KeyError as error:
-        message = f'Ошибка доступа по ключу homework_name: {error}'
-        logger.error(message)
-    try:
-        homework_status = homework.get('status')
-    except KeyError as error:
-        message = f'Ошибка доступа по ключу status: {error}'
-        logger.error(message)
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
 
-    verdict = HOMEWORK_STATUSES[homework_status]
+    if homework_name is None:
+        message = 'Ошибка доступа по ключу homework_name'
+        raise KeyError(message)
+
+    if homework_status is None:
+        message = 'Ошибка доступа по ключу status'
+        raise KeyError(message)
+
+    verdict = HOMEWORK_STATUSES.get(homework_status)
 
     if verdict is None:
         message = 'Неизвестный статус домашней работы.'
-        logger.error(message)
         raise exceptions.UnknownHWStatusException(message)
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -118,48 +125,45 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
+
     if not check_tokens():
         message = 'Переменная среды не найдена.'
         logger.critical(message)
-        raise exceptions.NoRequiredTokensException(message)
+        raise sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-
-    ex_status = None
-    ex_error = None
+    homework_old_data = {
+        'homework_name': '',
+        'message': ''
+    }
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
-        except exceptions.IncorrectResponseException as error:
-            if str(error) != ex_error:
-                ex_error = str(error)
-                send_message(bot, error)
-            logger.error(error)
-            time.sleep(RETRY_TIME)
-            continue
-
-        try:
             homework = check_response(response)
-            homework_status = homework[0].get('status')
-
-            if homework_status != ex_status:
-                ex_status = homework_status
-                message = parse_status(homework[0])
+            if message != homework_old_data['message']:
                 send_message(bot, message)
-            else:
-                logger.debug('Обновлений у статуса домашней работы нет.')
-
-            time.sleep(RETRY_TIME)
+                homework_old_data = {
+                    'homework_name': homework[0]['homework_name'],
+                    'message': message
+                }
         except Exception as error:
+            logging.error(f'Сбой в работе программы: {error}')
             message = f'Сбой в работе программы: {error}'
-            if ex_error != str(error):
-                ex_error = str(error)
+            if message != homework_old_data['message']:
+                homework_old_data['message'] = message
                 send_message(bot, message)
-            logger.error(message)
+        finally:
             time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format=('%(asctime)s - %(levelname)s - %(name)s - %(lineno)d - '
+                '%(message)s'),
+        level=logging.INFO,
+        filename="program.log",
+        filemode="w",
+    )
     main()
