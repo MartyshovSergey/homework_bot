@@ -27,9 +27,6 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
-
 
 def send_message(bot, message):
     """Отправка сообщения."""
@@ -53,40 +50,33 @@ def get_api_answer(current_timestamp):
         message = 'Сбой запроса к ENDPOINT.'
         raise exceptions.ResponseStatusException(message)
     if response.status_code != HTTPStatus.OK:
-        raise SystemError(f'Ошибка: {response.reason}; '
-                          f'Код: {response.status_code}')
+        raise SystemError(
+            'Ответ сервера не является успешным:'
+            f' request params = {params};'
+            f' http_code = {response.status_code};'
+            f' reason = {response.reason}; content = {response.text}'
+        )
     return response.json()
 
 
 def check_response(response):
     """Проверка ответа на корректность."""
-    keys = ['current_date', 'homeworks']
-
     if not isinstance(response, dict):
         message = (f'Ответ является {type(response)}, а не словарем')
         raise TypeError(message)
 
-    try:
-        homeworks = response.get('homeworks')
-    except KeyError as error:
-        message = f'Ошибка доступа: {error}'
-        raise exceptions.CheckResponseException(message)
+    homeworks = response.get('homeworks')
+    if not homeworks:
+        raise exceptions.CheckResponseException('Ошибка доступа')
 
-    if keys[0] not in response.keys() and keys[1] not in response.keys():
-        empty_key_list = []
-        for key in keys:
-            if key not in response.keys():
-                empty_key_list.append(key)
-        message = (f'Отсутствует: {",".join(empty_key_list)}')
-        raise exceptions.CheckResponseException(message)
-
-    if homeworks is None:
-        message = 'Ответ не содежит словаря с домашники работами.'
-        raise exceptions.CheckResponseException(message)
+    for key in ['current_date', 'homeworks']:
+        if key not in response.keys():
+            raise exceptions.CheckResponseException(
+                'Отсутствует ключ: "current_date" или "homeworks".'
+            )
 
     if not isinstance(homeworks, list):
         message = 'Ответ не представлен списком'
-        logger.error(message)
         raise exceptions.CheckResponseException(message)
 
     if len(homeworks) == 0:
@@ -128,10 +118,10 @@ def main():
     if not check_tokens():
         message = 'Переменная среды не найдена.'
         logger.critical(message)
-        raise sys.exit(message)
+        sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
+    current_timestamp = int(time.time() - 1662043387)
     homework_old_data = {
         'homework_name': '',
         'message': ''
@@ -140,11 +130,12 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            homework = check_response(response)
+            homeworks = check_response(response)
+            message = parse_status(homeworks[0])
             if message != homework_old_data['message']:
                 send_message(bot, message)
                 homework_old_data = {
-                    'homework_name': homework[0]['homework_name'],
+                    'homework_name': homeworks[0]['homework_name'],
                     'message': message
                 }
         except Exception as error:
@@ -165,4 +156,7 @@ if __name__ == '__main__':
         filename="program.log",
         filemode="w",
     )
+    logger = logging.getLogger(__name__)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+
     main()
