@@ -27,6 +27,9 @@ HOMEWORK_STATUSES = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+
 
 def send_message(bot, message):
     """Отправка сообщения."""
@@ -67,7 +70,9 @@ def check_response(response):
 
     homeworks = response.get('homeworks')
     if not homeworks:
-        raise exceptions.CheckResponseException('Ошибка доступа')
+        raise exceptions.CheckResponseException(
+            'В статусе работ изменений нет'
+        )
 
     for key in ['current_date', 'homeworks']:
         if key not in response.keys():
@@ -121,7 +126,7 @@ def main():
         sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time() - 1662043387)
+    current_timestamp = int(time.time() - RETRY_TIME)
     homework_old_data = {
         'homework_name': '',
         'message': ''
@@ -156,7 +161,5 @@ if __name__ == '__main__':
         filename="program.log",
         filemode="w",
     )
-    logger = logging.getLogger(__name__)
-    logger.addHandler(logging.StreamHandler(sys.stdout))
 
     main()
