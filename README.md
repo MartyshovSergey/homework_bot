@@ -32,7 +32,7 @@ https://practicum.yandex.ru/api/user_api/homework_statuses/
 
 и доступ к нему возможен только по токену.
 
-Получить токен можно по [ссылке](https://oauth.yandex.ru/verification_code#access_token=y0_AgAAAAAR_U-IAAYckQAAAADahbMdmXDkOZsnSlC--dBaqVZ_r2J7ui4&token_type=bearer&expires_in=2592000,)он нам пригодится позже.
+Получить токен можно по [ссылке](https://oauth.yandex.ru/verification_code#access_token=y0_AgAAAAAR_U-IAAYckQAAAADahbMdmXDkOZsnSlC--dBaqVZ_r2J7ui4&token_type=bearer&expires_in=2592000), он нам пригодится позже.
 
 - Клонировать репозиторий и перейти в него в командной строке.
 - Установить и активировать виртуальное окружение c Python 3.7 (python не ниже
