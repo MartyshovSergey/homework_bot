@@ -55,7 +55,7 @@ python3 -m pip install --upgrade pip
 ```
 pip install -r requirements.txt
 ```
-- В консоле импортируем токены для ЯндексюПрактикум и для Телеграмм:
+- В консоле импортируем токены для Яндекс.Практикум и для Телеграмм:
 
 ```
 export PRACT_TOKEN=<PRACTICUM_TOKEN>
